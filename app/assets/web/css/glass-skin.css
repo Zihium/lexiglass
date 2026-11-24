@@ -1,0 +1,407 @@
+/*!
+ * glass-skin.css — Liquid Glass 皮肤（v3，对齐 Kyant0/AndroidLiquidGlass）
+ *
+ * 只做两件事：
+ *   ① 令牌：把上游 Kotlin 里的 Color / dp 常量翻成 CSS 变量
+ *   ② 玻璃配方：把 drawBackdrop(effects, highlight, shadow, onDrawSurface) 的每组参数
+ *      固化成 .lg--* 类
+ *
+ * 上游配方对照（branch kmp）：
+ *
+ *   LiquidBottomTabs  Row.drawBackdrop(Capsule)
+ *     effects   = vibrancy() + blur(8dp) + lens(24dp, 24dp)
+ *     surface   = 0xFFFAFAFA@40% | 0xFF121212@40%
+ *     highlight = Highlight.Default（0.5dp / white@.5 / 45° / Plus）
+ *     -> .nav-glass（见 vendor/dock.css）
+ *
+ *   LiquidButton      Row.drawBackdrop(Capsule), height 48dp, padding h 16dp
+ *     effects   = vibrancy() + blur(2dp) + lens(12dp, 24dp)
+ *     surface   = surfaceColor（示例 White@30%）| 无
+ *     label     = 15sp
+ *     -> .lg--btn / .lg--btn-surface
+ *
+ *   ControlCenter     Box.drawBackdrop(RoundedRectangle(34dp)), item 68dp, spacing 16dp
+ *     effects   = vibrancy() + lens(24dp, 48dp, depthEffect = true)
+ *     surface   = Black@5%
+ *     -> .lg--tile
+ *
+ *   LiquidToggle      track 64x28 Capsule, knob 40x24 drawBackdrop(Capsule)
+ *     knob fx   = blur(8dp * (1-p)) + lens(5dp*p, 10dp*p, chromaticAberration)
+ *     knob surf = White@(1-p)
+ *     accent    = 0xFF34C759 | 0xFF30D158
+ *     -> .toggle / .toggle-knob
+ *
+ *   Catalog 列表      无玻璃：纯文字 17sp + 16dp padding
+ *     -> .law / .row / .toc-item
+ */
+
+/* ==========================================================================
+   1. 令牌
+   ========================================================================== */
+:root,
+html[data-theme="light"] {
+  color-scheme: light;
+
+  /* 文本 */
+  --ink: #000;
+  --ink-2: #3c3c43;
+  --muted: rgba(60, 60, 67, .60);
+  --muted-2: rgba(60, 60, 67, .40);
+
+  /* 底色（上游是纯色 canvas，没有卡片底） */
+  --canvas: #f7f7f8;
+  --canvas-2: #ffffff;
+
+  /* 强调色：LiquidBottomTabs accentColor(light) */
+  --accent: #0088ff;
+  --accent-soft: rgba(0, 136, 255, .12);
+  --green: #34c759;
+
+  /* 分隔线 */
+  --hairline: rgba(0, 0, 0, .08);
+  --hairline-2: rgba(0, 0, 0, .05);
+
+  /* 玻璃表面（上游 onDrawSurface 的三种取值） */
+  --surf-tabs: rgba(250, 250, 250, .40);   /* 0xFFFAFAFA@40% */
+  --surf-tile: rgba(0, 0, 0, .05);         /* Black@5%（ControlCenter） */
+  --surf-btn: rgba(255, 255, 255, .30);    /* White@30%（Surface Liquid Button） */
+  --surf-press: rgba(0, 0, 0, .04);
+  --surf-float: rgba(250, 250, 250, .42);  /* 浮在正文之上的玻璃（顶栏 / toast） */
+  /* 抽屉：比 float 更薄，折射才看得见（页面内容要在玻璃后面动） */
+  --surf-sheet: rgba(250, 250, 250, .44);
+  /* 页内搜索：形制同 LiquidButton，但要让正文透过去 */
+  --surf-search: rgba(255, 255, 255, .28);
+  /* 选项窗口 */
+  --surf-card: rgba(250, 250, 250, .60);
+  --track: rgba(120, 120, 128, .40);
+
+  /* 高光 / 描边 */
+  --rim-a: rgba(255, 255, 255, .85);
+  --rim-b: rgba(255, 255, 255, .28);
+  --rim-c: rgba(255, 255, 255, .06);
+  --rim-d: rgba(255, 255, 255, .55);
+  --sheen: .30;
+
+  /* 极光背景（玻璃要有点东西可折才看得见） */
+  --aurora-1: rgba(120, 190, 255, .55);
+  --aurora-2: rgba(180, 150, 255, .42);
+  --aurora-3: rgba(120, 235, 205, .40);
+  --aurora-4: rgba(255, 190, 150, .34);
+  --aurora-5: rgba(150, 200, 255, .38);
+
+  /* 安全区。WebView 是 edge-to-edge 的，CSS 的 env() 在这里恒为 0，
+     所以由原生把真实 inset 推到 --safe-top / --safe-bottom 上 */
+  /* 下限 8px：部分机型的前摄挖孔不报 displayCutout inset（实测 insets 全 0），
+     留一点余量，避免阅读页胶囊顶栏压到摄像头 */
+  --top: max(var(--safe-top, 0px), env(safe-area-inset-top, 0px), 8px);
+  --bottom: max(var(--safe-bottom, 0px), env(safe-area-inset-bottom, 0px));
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink: #fff;
+  --ink-2: rgba(235, 235, 245, .92);
+  --muted: rgba(235, 235, 245, .58);
+  --muted-2: rgba(235, 235, 245, .34);
+
+  --canvas: #0b0b0d;
+  --canvas-2: #141417;
+
+  /* accentColor(dark) */
+  --accent: #0091ff;
+  --accent-soft: rgba(0, 145, 255, .18);
+  --green: #30d158;
+
+  --hairline: rgba(255, 255, 255, .12);
+  --hairline-2: rgba(255, 255, 255, .07);
+
+  --surf-tabs: rgba(18, 18, 18, .40);      /* 0xFF121212@40% */
+  --surf-tile: rgba(255, 255, 255, .06);
+  --surf-btn: rgba(255, 255, 255, .08);
+  --surf-press: rgba(255, 255, 255, .06);
+  --surf-float: rgba(22, 22, 24, .46);
+  --surf-sheet: rgba(26, 26, 29, .46);
+  --surf-search: rgba(28, 28, 31, .32);
+  --surf-card: rgba(28, 28, 31, .64);
+  --track: rgba(140, 140, 150, .58);
+
+  --rim-a: rgba(255, 255, 255, .34);
+  --rim-b: rgba(255, 255, 255, .14);
+  --rim-c: rgba(255, 255, 255, .04);
+  --rim-d: rgba(255, 255, 255, .20);
+  --sheen: .14;
+
+  --aurora-1: rgba(30, 110, 220, .55);
+  --aurora-2: rgba(90, 70, 200, .50);
+  --aurora-3: rgba(20, 130, 140, .42);
+  --aurora-4: rgba(150, 90, 60, .34);
+  --aurora-5: rgba(40, 80, 180, .46);
+}
+
+/* ==========================================================================
+   2. 背景
+   ========================================================================== */
+html {
+  background: var(--canvas);
+}
+
+/* 极光层：固定在视口、pointer-events: none、z-index 0。
+   绝对不能给它 backdrop-filter / filter / isolation —— 那会造出 backdrop root，
+   让上面所有玻璃件只采到自己。 */
+html::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(52% 30% at 8% 2%, var(--aurora-1) 0%, transparent 66%),
+    radial-gradient(46% 28% at 96% 12%, var(--aurora-2) 0%, transparent 68%),
+    radial-gradient(58% 34% at 104% 54%, var(--aurora-3) 0%, transparent 66%),
+    radial-gradient(50% 30% at -4% 76%, var(--aurora-4) 0%, transparent 68%),
+    radial-gradient(64% 36% at 58% 102%, var(--aurora-5) 0%, transparent 70%);
+}
+
+body.liquid-glass {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+/* ==========================================================================
+   3. 玻璃基类（覆盖 liquid-glass.css 的默认令牌，只留一个入口）
+   ========================================================================== */
+.lg {
+  --lg-saturate: 1.5;          /* vibrancy() */
+  --lg-brightness: 1;
+  --lg-surface: var(--surf-tile);
+  --lg-sheen: var(--sheen);
+  --lg-text: var(--ink);
+  --lg-text-muted: var(--muted);
+  --lg-rim-a: var(--rim-a);
+  --lg-rim-b: var(--rim-b);
+  --lg-rim-c: var(--rim-c);
+  --lg-rim-d: var(--rim-d);
+  /* 上游只有一句很轻的 Shadow(alpha ≤ .2)，常态给 0 */
+  --lg-shadow: none;
+  --lg-shadow-press: none;
+  --lg-dur: .38s;
+  --lg-spring: cubic-bezier(.22, 1.12, .36, 1);
+
+  /* 透镜默认值（各变体覆盖） */
+  --lg-lens-band: .28;
+  --lg-lens-power: 2;
+  --lg-lens-scale: 12;
+
+  border-radius: var(--lg-r);
+  border: 0;
+}
+
+/* 上游 Highlight.Default：0.5dp 宽、45°、white@.5、BlendMode.Plus */
+.lg::before {
+  padding: .5px;
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, .62) 0%,
+      rgba(255, 255, 255, .16) 42%,
+      rgba(255, 255, 255, .06) 62%,
+      rgba(255, 255, 255, .38) 100%);
+  mix-blend-mode: plus-lighter;
+}
+
+/* 指针高光（InteractiveHighlight 的静态近似） */
+.lg::after {
+  background:
+    radial-gradient(120% 96% at var(--lg-sx, 50%) var(--lg-sy, 0%),
+      rgba(255, 255, 255, calc(var(--sheen) * 1.2)) 0%,
+      rgba(255, 255, 255, calc(var(--sheen) * .34)) 34%,
+      rgba(255, 255, 255, 0) 66%);
+  mix-blend-mode: plus-lighter;
+}
+
+/* ==========================================================================
+   3b. 让宿主里原有的 background / backdrop-filter 声明让位
+   宿主样式表（app.css）里的 .sheet / .field.compact 会写 background:transparent，
+   它们的选择器权重不低于 .lg，而且在 .lg 之后……不，是把 .lg 的效果盖掉了。
+   skin 是最后加载的一份，这里用双类名把配方抢回来。
+   ========================================================================== */
+.lg.lg--sheet,
+.lg.lg--sheetcard,
+.lg.lg--search {
+  background: var(--lg-surface);
+}
+
+/* ==========================================================================
+   4. 变体：每组对应源码里一次 drawBackdrop
+   ========================================================================== */
+
+/* LiquidButton：vibrancy + blur(2dp) + lens(12dp, 24dp)，h48 / px16 / label 15sp */
+.lg--btn {
+  --lg-r: 999px;
+  --lg-blur: 2px;
+  --lg-surface: transparent;
+  --lg-lens-band: .40;
+  --lg-lens-power: 2;
+  --lg-lens-scale: 10;
+}
+
+/* 有底的按钮：surfaceColor = White@30% */
+.lg--btn-surface {
+  --lg-surface: var(--surf-btn);
+}
+
+/* ControlCenter 磁贴：lens(24dp, 48dp)，Black@5%，无 blur */
+.lg--tile {
+  --lg-r: 28px;
+  --lg-blur: 0px;
+  --lg-surface: var(--surf-tile);
+  --lg-lens-band: .30;
+  --lg-lens-power: 1.9;
+  --lg-lens-scale: 16;
+}
+
+/* 容器类玻璃（Dock / 顶栏 / 抽屉）：vibrancy + blur(8dp) + lens(24dp, 24dp) */
+.lg--container {
+  --lg-r: 999px;
+  --lg-blur: 8px;
+  --lg-surface: var(--surf-tabs);
+  --lg-lens-band: .22;
+  --lg-lens-power: 2;
+  --lg-lens-scale: 18;
+}
+
+/* 输入框：形制同 LiquidButton，高度 48 */
+.lg--field {
+  --lg-r: 999px;
+  --lg-blur: 12px;
+  --lg-surface: var(--surf-btn);
+  --lg-lens-band: .40;
+  --lg-lens-power: 2;
+  --lg-lens-scale: 8;
+}
+
+/* 抽屉（目录）：薄玻璃 + 小 blur + 大折射带。
+   blur 一旦上到 18px，背后的正文就被抹成一片均匀灰，看起来像纯色 —— 
+   这里刻意压到 5px，让字块形状还在，边缘透镜才有东西可折。 */
+.lg--sheet {
+  --lg-r: 28px 0 0 28px;
+  --lg-blur: 9px;
+  --lg-saturate: 1.7;
+  --lg-surface: var(--surf-sheet);
+  --lg-lens-band: .15;
+  --lg-lens-power: 2.1;
+  --lg-lens-scale: 30;
+}
+
+/* 选项窗口 / 确认框：四角 28，从底部弹起 */
+.lg--sheetcard {
+  --lg-r: 28px;
+  --lg-blur: 14px;
+  --lg-saturate: 1.7;
+  --lg-surface: var(--surf-card);
+  --lg-lens-band: .12;
+  --lg-lens-power: 2.1;
+  --lg-lens-scale: 24;
+}
+
+/* 页内搜索：LiquidButton 的形制（h40 / Capsule / White@40%）+ 可见折射 */
+.lg--search {
+  --lg-r: 999px;
+  --lg-blur: 6px;
+  --lg-saturate: 1.9;
+  --lg-surface: var(--surf-search);
+  --lg-lens-band: .34;
+  --lg-lens-power: 2.4;
+  --lg-lens-scale: 22;
+}
+
+/* 胶囊小件（chip）：只毛玻璃，不做折射，省 GPU */
+.lg--chip {
+  --lg-r: 999px;
+  --lg-blur: 10px;
+  --lg-surface: var(--surf-btn);
+  --lg-lens-scale: 0;
+}
+
+/* ==========================================================================
+   5. 兼容宿主页面历史类名（别的项目可能已经引用）
+   ========================================================================== */
+.lg--capsule { --lg-r: 999px; }
+.lg--pill    { --lg-r: 999px; --lg-blur: 12px; }
+.lg--card    { --lg-r: 22px; --lg-blur: 12px; --lg-surface: var(--surf-btn); }
+.lg--hero    { --lg-r: 30px; --lg-blur: 0px; --lg-surface: var(--surf-tile); }
+.lg--flat    { --lg-surface: transparent; --lg-blur: 0px; }
+
+/* ==========================================================================
+   6. Toggle（LiquidToggle 1:1）
+   track 64x28 Capsule，knob 40x24，accent 绿
+   ========================================================================== */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 64px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  border-radius: 999px;
+  background-color: rgba(120, 120, 120, .20);   /* 0xFF787878@20% */
+  cursor: pointer;
+  transition: background-color .28s cubic-bezier(.22, 1.12, .36, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+html[data-theme="dark"] .toggle {
+  background-color: rgba(120, 120, 136, .36);   /* 0xFF787880@36% */
+}
+.toggle[aria-checked="true"] { background-color: var(--green); }
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 40px;
+  height: 24px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .05);
+  transform: translateX(0);
+  transition: transform .32s cubic-bezier(.22, 1.12, .36, 1);
+}
+.toggle[aria-checked="true"] .toggle-knob { transform: translateX(20px); }
+
+/* ==========================================================================
+   更多菜单 / 分段控件（本轮新增）
+   ========================================================================== */
+.lg--menu {
+  --lg-r: 22px;
+  --lg-blur: 14px;
+  --lg-saturate: 1.7;
+  --lg-surface: var(--surf-card);
+  --lg-lens-band: .12;
+  --lg-lens-power: 2.1;
+  --lg-lens-scale: 20;
+}
+
+.lg--seg {
+  --lg-r: 999px;
+  --lg-blur: 6px;
+  --lg-saturate: 1.8;
+  --lg-surface: var(--surf-btn);
+  --lg-lens-band: .30;
+  --lg-lens-power: 2.2;
+  --lg-lens-scale: 14;
+}
+
+.lg--chip {
+  --lg-r: 999px;
+  --lg-blur: 6px;
+  --lg-surface: var(--surf-btn);
+  --lg-lens-band: .34;
+  --lg-lens-scale: 16;
+}
+
+/* 双类名压回配方，避免被 .field / .card 的 background 覆盖 */
+.lg.lg--menu { background: var(--lg-surface); }
+.lg.lg--seg { background: var(--lg-surface); }
+.lg.lg--chip { background: var(--lg-surface); }
+.lg.lg--field { background: var(--surf-btn); backdrop-filter: none; }

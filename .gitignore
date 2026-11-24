@@ -1,0 +1,20 @@
+# 构建产物与中间文件
+/build/
+/out/
+*.apk
+
+# 法规数据（体积大，且可通过 tools/crawl_local.py 重新采集）
+/app/assets/web/data/
+
+# 签名密钥（勿提交）
+/tools/*.keystore
+/tools/*.pem
+*.jks
+*.keystore
+
+# Gradle / IDE
+.gradle/
+.idea/
+local.properties
+*.iml
+.DS_Store

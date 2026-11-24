@@ -1,0 +1,390 @@
+/*!
+ * liquid-glass-dock.css — v2.1
+ * 1:1 port of LiquidBottomTabs / LiquidBottomTab from
+ *   https://github.com/Kyant0/AndroidLiquidGlass  (branch: kmp)
+ *   app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidBottomTabs.kt
+ *   app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidBottomTab.kt
+ *
+ * 三个绘制层，对应源码里的三次 drawBackdrop：
+ *
+ *   ① .nav-glass   ← Row.drawBackdrop(Capsule)
+ *                    effects = vibrancy() + blur(8.dp) + lens(24.dp, 24.dp)
+ *                    onDrawSurface = drawRect(0xFFFAFAFA @40% | 0xFF121212 @40%)
+ *                    + Highlight.Default（45° white@0.5, BlendMode.Plus）
+ *                    + 容器按压缩放 lerp(1, 1 + 16.dp / W, p)
+ *
+ *   ② .tab-btn     ← LiquidBottomTab：Column(spacedBy(2.dp)) + Box.size(28.dp) + 12.sp
+ *                    contentColor 由 dampedDragAnimation.value 连续插值到 accentColor
+ *
+ *   ③ .nav-pill    ← Box.drawBackdrop(combined(backdrop, tabsBackdrop))
+ *                    effects = lens(10.dp * p, 14.dp * p, chromaticAberration = true)
+ *                    highlight/shadow/innerShadow 全部 * p
+ *                    onDrawSurface = Black@0.1 *(1-p) + Black@0.03 * p
+ *                    ** 源码里这个 Box 写在两个 Row 之后，所以画在 tab 内容之上，
+ *                       透镜才能吃到图标与文字（这是"选中项被放大/折射"的来源）。
+ *
+ * DOM 契约：
+ *   <nav class="nav-tabs" id="bottom-nav">
+ *     <div class="nav-glass lg-lens" aria-hidden="true"></div>
+ *     <div class="nav-pill" aria-hidden="true" data-lg-lens></div>
+ *     <button class="tab-btn active" data-icon="home" data-tab="home">首页</button>
+ *     ...
+ *   </nav>
+ *
+ * JS 只写自定义属性（--lg-p / --lg-x / --lg-sx / --lg-sy / --lg-tab-scale /
+ * --lg-panel / --lg-count / --sel），不直接改样式，方便静态降级。
+ */
+
+/* ==========================================================================
+   1. 令牌（源码里的 dp / Color 常量，一字不改地搬过来）
+   ========================================================================== */
+.nav-tabs {
+  /* 尺寸：dp -> px 1:1 */
+  --lg-tabs-h: 64px;          /* Row.height(64.dp) */
+  --lg-tabs-pad: 4px;         /* .padding(4.dp) */
+  --lg-tabs-inner: 56px;      /* 指示器 / tab 高度 56.dp */
+  --lg-tabs-icon: 28px;       /* Box.size(28.dp) */
+  --lg-tabs-label: 12px;      /* TextStyle(12.sp) */
+  --lg-tabs-gap: 2px;         /* spacedBy(2.dp) */
+
+  /* 容器玻璃：vibrancy() = saturation 1.5，blur(8.dp)，lens(24.dp, 24.dp)
+     关键：背后内容要「看得见 + 被掰弯」，不是糊死。
+     白度 16%（暗 22%）+ 5px 轻糊 + lens 30 的强折射＝参考图那种薄玻璃 */
+  --lg-blur: 5px;
+  --lg-saturate: 1;
+  --lg-brightness: 1.04;
+  --lg-lens-band: .26;
+  --lg-lens-power: 2;
+  --lg-lens-scale: 30;
+
+  /* 运行时状态（由 dock.js 写入） */
+  --lg-p: 0;                  /* pressProgress */
+  --lg-count: 4;
+  --lg-x: 0px;                /* 指示器位移 = value * tabWidth */
+  --lg-sx: 1;                 /* 指示器 scaleX（含 velocity 拉伸） */
+  --lg-sy: 1;                 /* 指示器 scaleY */
+  --lg-tab-scale: 1;          /* 内容 scale = lerp(1, 1.2, p) */
+  --lg-hl-x: 50%;             /* 按压高光中心（跟随指示器中心） */
+  --lg-panel: 0px;            /* panelOffset = 4dp * sign(f) * EaseOut(|f|) */
+  --lg-dock-scale: 1;
+
+  /* 配色：light = 0xFFFAFAFA@40% / Black@10% ; dark = 0xFF121212@40% / White@10% */
+  --lg-tabs-bg: rgba(255, 255, 255, .16);
+  --lg-tabs-indicator: rgba(0, 0, 0, .09);
+  --lg-tabs-ink: #000;
+  --lg-accent: #0088FF;          /* accentColor（light） */
+
+  position: fixed;
+  /* 20px：按压时指示器会放大到 1.39 倍并鼓出胶囊（源码 pressedScale = 78/56），
+     左右各留出 20px 才不会被视口边缘裁掉 —— 裁掉会让 Chromium 把 backdrop
+     采样成一份镜像重影（实测） */
+  left: 20px;
+  right: 20px;
+  bottom: calc(12px + var(--bottom, env(safe-area-inset-bottom, 0px)));
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--lg-tabs-h);
+  padding: var(--lg-tabs-pad);
+  max-width: 560px;
+  margin: 0 auto;
+  border: 0;
+  border-radius: 999px;                 /* Capsule */
+  background: transparent;
+  overflow: visible;
+  -webkit-tap-highlight-color: transparent;
+  /* 必须是 none：pan-y 时 Chromium 会把横向拖动判成滚动手势并抛 pointercancel，
+     指示器只会挪动几像素就断（实测 16 个 move 后 CANCEL，value 不再变化）。
+     改成 none 后同一次滑动能拿到 250+ 个 move，value 平滑跟手。 */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transform: translate3d(var(--lg-panel), 0, 0) scale(var(--lg-dock-scale, 1));
+  will-change: transform;
+  white-space: normal;
+}
+
+html[data-theme="dark"] .nav-tabs {
+  --lg-tabs-bg: rgba(16, 16, 20, .22);
+  --lg-tabs-indicator: rgba(255, 255, 255, .1);
+  --lg-tabs-ink: #fff;
+  --lg-accent: #0091FF;          /* accentColor（dark） */
+}
+
+/* ==========================================================================
+   2. 容器玻璃（.nav-glass）
+   ========================================================================== */
+.nav-glass {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background-color: var(--lg-tabs-bg);
+  pointer-events: none;
+  isolation: isolate;
+  box-shadow:
+    /* Highlight.Default：width .5dp / white@.5 / 45° / BlendMode.Plus */
+    inset 0 .5px 0 rgba(255, 255, 255, .45),
+    inset .5px 0 0 rgba(255, 255, 255, .14),
+    inset 0 -.5px 0 rgba(255, 255, 255, .08),
+    /* Shadow.Default */
+    0 8px 24px rgba(0, 0, 0, .07);
+}
+
+html[data-theme="dark"] .nav-glass {
+  box-shadow:
+    inset 0 .5px 0 rgba(255, 255, 255, .30),
+    inset .5px 0 0 rgba(255, 255, 255, .10),
+    inset 0 -.5px 0 rgba(255, 255, 255, .06),
+    0 10px 28px rgba(0, 0, 0, .32);
+}
+
+/* 45° 渐变边缘（HighlightStyle.Default：white@.5，BlendMode.Plus） */
+.nav-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: .5px;
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, .62) 0%,
+      rgba(255, 255, 255, .16) 42%,
+      rgba(255, 255, 255, .06) 62%,
+      rgba(255, 255, 255, .38) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  mix-blend-mode: plus-lighter;
+}
+
+/* InteractiveHighlight：整面 white@8% + 1.5*minDim 径向 white@15%（Plus） */
+.nav-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 96px at var(--lg-hl-x) 50%,
+      rgba(255, 255, 255, calc(.15 * var(--lg-p))) 0%,
+      rgba(255, 255, 255, calc(.15 * var(--lg-p))) 48px,
+      rgba(255, 255, 255, 0) 96px),
+    rgba(255, 255, 255, calc(.08 * var(--lg-p)));
+  mix-blend-mode: plus-lighter;
+}
+
+/* ==========================================================================
+   3. 选中指示器（.nav-pill）—— 画在 tab 内容之上，透镜才吃得到图标与文字
+   ========================================================================== */
+.nav-pill {
+  position: absolute;
+  top: var(--lg-tabs-pad);
+  /* 百分比按 nav 的 padding box 解析（border 为 0，所以等于整条 Dock 的宽 W）；
+     源码 tabWidth = (W - 8.dp) / tabsCount，指示器宽度就是它 */
+  --lg-tab-w: calc((100% - var(--lg-tabs-pad) * 2) / var(--lg-count, 4));
+  width: var(--lg-tab-w);
+  height: var(--lg-tabs-inner);
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 999px;
+  /* 源码 onDrawSurface：Black@0.1 * (1 - p) 叠加 Black@0.03 * p
+     => 等效单色 alpha = .1 - .07p */
+  background-color: rgba(0, 0, 0, calc(.10 - .06 * var(--lg-p)));
+  left: calc(var(--lg-tabs-pad) + var(--lg-x, 0px));
+  transform: scale(var(--lg-sx, 1), var(--lg-sy, 1));
+  transform-origin: center center;
+  pointer-events: none;
+  z-index: 4;
+  will-change: transform;
+
+  /* 水滴透镜：lens(10.dp * p, 14.dp * p, chromaticAberration = true)
+     位移贴图的 scale 由 dock.js 每帧写进 feDisplacementMap（3 -> 15），
+     这里只给初值与形状参数，避免反复重建贴图 */
+  --lg-lens-scale: 3;
+  --lg-lens-band: .26;
+  --lg-lens-power: 2.2;
+  --lg-blur: 0px;
+  --lg-saturate: 1;
+  --lg-brightness: 1;
+
+  /* Highlight / Shadow / InnerShadow，全部 * p —— 常态无影，按下才浮起 */
+  box-shadow:
+    inset 0 .5px 0 rgba(255, 255, 255, calc(.55 * var(--lg-p))),
+    inset .5px 0 0 rgba(255, 255, 255, calc(.18 * var(--lg-p))),
+    inset 0 -.5px 0 rgba(255, 255, 255, calc(.12 * var(--lg-p))),
+    inset 0 0 calc(1px + 7px * var(--lg-p)) rgba(0, 0, 0, calc(.16 * var(--lg-p))),
+    0 calc(1px + 4px * var(--lg-p)) calc(2px + 12px * var(--lg-p)) rgba(0, 0, 0, calc(.20 * var(--lg-p)));
+}
+
+html[data-theme="dark"] .nav-pill {
+  background-color: rgba(255, 255, 255, calc(.12 - .07 * var(--lg-p)));
+  box-shadow:
+    inset 0 .5px 0 rgba(255, 255, 255, calc(.42 * var(--lg-p))),
+    inset .5px 0 0 rgba(255, 255, 255, calc(.14 * var(--lg-p))),
+    inset 0 -.5px 0 rgba(255, 255, 255, calc(.10 * var(--lg-p))),
+    inset 0 0 calc(1px + 8px * var(--lg-p)) rgba(0, 0, 0, calc(.28 * var(--lg-p))),
+    0 calc(1px + 5px * var(--lg-p)) calc(3px + 14px * var(--lg-p)) rgba(0, 0, 0, calc(.42 * var(--lg-p)));
+}
+
+/* 色散（chromaticAberration = true）：RGB 三通道折射率不同，
+   在胶囊边缘析出一圈青/品红/青绿的棱镜环，Plus 混合 */
+.nav-pill::after {
+  content: "";
+  position: absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    conic-gradient(from 208deg,
+      #6FC8FF 0deg,
+      #8FE9FF 40deg,
+      #FFFFFF 84deg,
+      #FF9EDC 150deg,
+      #FF74C8 186deg,
+      #FFFFFF 226deg,
+      #8AFFE6 292deg,
+      #6FC8FF 360deg);
+  -webkit-mask: radial-gradient(closest-side,
+      rgba(0, 0, 0, 0) calc(100% - 2px),
+      #000 calc(100% - 0.4px));
+  mask: radial-gradient(closest-side,
+      rgba(0, 0, 0, 0) calc(100% - 2px),
+      #000 calc(100% - 0.4px));
+  opacity: calc(var(--lg-p) * .55);
+  mix-blend-mode: plus-lighter;
+}
+
+/* 水滴顶面高光：按压时出现的一枚椭圆亮斑（源码 Highlight.Default 的落地近似） */
+.nav-pill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(62% 46% at 46% 14%,
+      rgba(255, 255, 255, calc(.60 * var(--lg-p))) 0%,
+      rgba(255, 255, 255, calc(.16 * var(--lg-p))) 42%,
+      rgba(255, 255, 255, 0) 72%);
+  mix-blend-mode: plus-lighter;
+}
+
+/* ==========================================================================
+   4. Tab（LiquidBottomTab：clip(Capsule) + 内容 scale + 图标 28 + 文字 12）
+   ========================================================================== */
+.tab-btn {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--lg-tabs-inner);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  /* 选中度 0..1 由 dock.js 每帧写入 —— 拖动时颜色在 ink 与 accent 之间连续插值 */
+  --sel: 0;
+  color: color-mix(in oklab,
+      var(--lg-tabs-ink) calc((1 - var(--sel)) * 100%),
+      var(--lg-accent));
+  font-size: var(--lg-tabs-label);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: .01em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lg-tabs-gap);
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  scale: var(--lg-tab-scale);
+  transform-origin: center center;
+}
+.tab-btn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* 图标：28dp 实心（源码 Box.size(28.dp).paint(vector, tint(contentColor))） */
+.tab-btn::before {
+  content: "";
+  width: var(--lg-tabs-icon);
+  height: var(--lg-tabs-icon);
+  flex: 0 0 auto;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: var(--lg-tabs-icon) var(--lg-tabs-icon);
+  mask-size: var(--lg-tabs-icon) var(--lg-tabs-icon);
+}
+
+.tab-btn[data-icon="home"]::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z'/></svg>");
+}
+.tab-btn[data-icon="library"]::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' fill-rule='evenodd' d='M4 6H2v14a2 2 0 0 0 2 2h14v-2H4V6zm16-4H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-7 9H9V9h4v2zm6 4H9v-2h10v2zm0-8H9V5h10v2z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' fill-rule='evenodd' d='M4 6H2v14a2 2 0 0 0 2 2h14v-2H4V6zm16-4H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm-7 9H9V9h4v2zm6 4H9v-2h10v2zm0-8H9V5h10v2z'/></svg>");
+}
+.tab-btn[data-icon="bookmark"]::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z'/></svg>");
+}
+.tab-btn[data-icon="user"]::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>");
+}
+/* 别名，方便别的项目直接复用本文件 */
+.tab-btn[data-icon="fav"]::before,
+.tab-btn[data-icon="me"]::before,
+.tab-btn[data-icon="bookmarks"]::before { mask-repeat: no-repeat; }
+
+/* ==========================================================================
+   5. 面板切换（宿主页面用 .tab-pane，非上游内容）
+   ========================================================================== */
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ==========================================================================
+   6. 降级
+   ========================================================================== */
+@media (prefers-reduced-transparency: reduce) {
+  .nav-glass,
+  .nav-pill {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .nav-glass { background-color: rgba(250, 250, 250, .96); }
+  html[data-theme="dark"] .nav-glass { background-color: rgba(18, 18, 18, .96); }
+  .nav-pill { background-color: rgba(0, 0, 0, .12); }
+  html[data-theme="dark"] .nav-pill { background-color: rgba(255, 255, 255, .14); }
+  .nav-pill::after { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-tabs,
+  .nav-pill,
+  .tab-btn { transition: none !important; }
+}
+
+/* 不支持 url() backdrop-filter 的浏览器（老 Firefox / 老 WebView）：
+   退化成毛玻璃，不会出现"没有背景"的空洞 */
+@supports not (backdrop-filter: url(#lg-lens-probe)) {
+  .nav-pill { --lg-lens-scale: 0; }
+}
+
+/* 宿主页面给 Dock 留出底部空间 */
+.has-glass-dock {
+  padding-bottom: calc(64px + 44px + var(--bottom, env(safe-area-inset-bottom, 0px)));
+}

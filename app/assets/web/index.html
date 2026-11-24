@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="glass-ui" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>LexiGlass · 法规速查</title>
+<script data-lg-injected src="lg/theme-boot.js"></script>
+<link data-lg-injected rel="stylesheet" href="lg/liquid-glass.css">
+<script data-lg-injected src="lg/liquid-glass.js"></script>
+<link rel="stylesheet" href="vendor/dock.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/glass-skin.css">
+</head>
+<body class="lg-host liquid-glass has-glass-dock">
+
+  <header class="glass-masthead">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 4.6v15.2M7.4 19.8h9.2M4.4 9.4h15.2"/><path d="M4.4 9.4 2.4 14.4a2.6 2.6 0 0 0 4.6 0Z"/><path d="M19.6 9.4l2 5a2.6 2.6 0 0 1-4.6 0Z"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1 class="page-title">法规速查</h1>
+        <p class="page-sub">离线法规库</p>
+      </div>
+    </div>
+    <div class="masthead-actions">
+      <button class="more-btn lg lg--chip lg-lens" type="button" id="btn-more"
+              aria-label="更多" aria-expanded="false" aria-controls="more-menu" data-lg-lens>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="5.2" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.8" cy="12" r="1.7"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= 更多菜单（Liquid Glass 下拉） ================= -->
+  <div class="more-pop lg lg--menu lg-lens" id="more-menu" role="menu" aria-label="更多" hidden data-lg-lens>
+    <button class="menu-item" type="button" role="menuitem" data-act="theme">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M19.1 4.9l-1.7 1.7M6.6 17.4l-1.7 1.7"/></svg>
+      <span>显示外观</span>
+      <span class="menu-val" id="menu-theme">跟随系统</span>
+    </button>
+    <button class="menu-item" type="button" role="menuitem" data-act="font">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19l6-14h1.6l6 14M6.6 13.6h8.8"/></svg>
+      <span>字号</span>
+      <span class="menu-val" id="menu-font">17</span>
+    </button>
+    <button class="menu-item" type="button" role="menuitem" data-act="history">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3 1.8"/></svg>
+      <span>搜索历史</span>
+      <span class="menu-val" id="menu-history">0</span>
+    </button>
+    <div class="menu-sep" aria-hidden="true"></div>
+    <button class="menu-item" type="button" role="menuitem" data-act="about">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 11v5M12 8.2v.1"/></svg>
+      <span>关于本软件</span>
+      <span class="menu-val" id="menu-version">1.0.0</span>
+    </button>
+  </div>
+
+  <main class="container">
+
+    <!-- ================= 首页 ================= -->
+    <section id="tab-home" class="tab-pane active">
+      <div class="glass-hero" data-lg-lens>
+        <div class="glass-orbit" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+        <div class="glass-hero-copy">
+          <h1>法规总览</h1>
+          <p id="hero-sub">法规全文 · 完全离线</p>
+          <button class="glass-hero-button" type="button" data-goto="1" data-lg-lens>开始检索 <span aria-hidden="true">↗</span></button>
+        </div>
+      </div>
+
+      <div class="glass-section-heading"><h2>快捷操作</h2></div>
+      <div class="quick-grid" id="quick-grid">
+        <button class="quick-tile lg lg--tile lg-lens" type="button" data-quick="search-all" data-lg-lens>
+          <span class="qt-ico">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.6" cy="10.6" r="6.4"/><path d="M19.6 19.6l-4.2-4.2"/></svg>
+          </span>
+          <span class="qt-name">全库全文搜索</span>
+          <span class="qt-desc" id="qt-search">在全部正文里找关键词</span>
+        </button>
+        <button class="quick-tile lg lg--tile lg-lens" type="button" data-quick="random" data-lg-lens>
+          <span class="qt-ico">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3.4l9.2 10H20M4 17h3.4l2.2-2.4M15.6 7H20M18 5l2 2-2 2M18 15l2 2-2 2"/></svg>
+          </span>
+          <span class="qt-name">随机一条</span>
+          <span class="qt-desc">抽一部法规，随手翻翻</span>
+        </button>
+        <button class="quick-tile lg lg--tile lg-lens" type="button" data-quick="region" data-lg-lens>
+          <span class="qt-ico">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6.8-6.1 6.8-11A6.8 6.8 0 1 0 5.2 10c0 4.9 6.8 11 6.8 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          </span>
+          <span class="qt-name">按地区浏览</span>
+          <span class="qt-desc" id="qt-region">省 → 市州两级筛选</span>
+        </button>
+        <button class="quick-tile lg lg--tile lg-lens" type="button" data-quick="stats" data-lg-lens>
+          <span class="qt-ico">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 19v-6M12 19v-9M16 19v-4"/></svg>
+          </span>
+          <span class="qt-name">数据统计</span>
+          <span class="qt-desc" id="qt-stats">收录 · 字数 · 覆盖</span>
+        </button>
+      </div>
+
+      <div class="glass-section-heading"><h2>运行概览</h2></div>
+      <div class="grid-stats">
+        <div class="stat-card"><div class="stat-label">收录法规</div><div class="stat-val" id="st-total">—</div><div class="stat-sub">部 · 离线</div></div>
+        <div class="stat-card"><div class="stat-label">累计字数</div><div class="stat-val" id="st-chars">—</div><div class="stat-sub">万字全文</div></div>
+        <div class="stat-card"><div class="stat-label">现行有效</div><div class="stat-val" id="st-valid">—</div><div class="stat-sub">部</div></div>
+        <div class="stat-card"><div class="stat-label">我的书签</div><div class="stat-val" id="st-fav">0</div><div class="stat-sub">条收藏</div></div>
+      </div>
+
+      <div class="glass-section-heading">
+        <h2>最近阅读</h2>
+        <button class="link-btn" type="button" data-goto="2">全部书签</button>
+      </div>
+      <div class="stack" id="recent-list"></div>
+
+      <div class="glass-section-heading">
+        <h2>按分类浏览</h2>
+        <button class="link-btn" type="button" data-goto="1">进入法规库</button>
+      </div>
+      <div class="cat-grid" id="cat-grid"></div>
+
+      <div class="glass-section-heading">
+        <h2>地方法规 · 按地区</h2>
+        <button class="link-btn" type="button" id="home-region-all">全部地区</button>
+      </div>
+      <div class="region-grid" id="region-grid"></div>
+
+      <p class="foot-note">
+        数据来自国家法律法规数据库，全部内容随安装包离线保存，不联网、不上传。点击底部任意标签切换；按住 Dock 左右拖动可直接跳转。
+      </p>
+    </section>
+
+    <!-- ================= 法规库 ================= -->
+    <section id="tab-library" class="tab-pane">
+      <div class="glass-page-heading">
+        <h1>法规库</h1>
+        <p id="lib-sub">全部法规 · 按名称或发布机关检索</p>
+      </div>
+
+      <div class="field lg lg--field lg-lens" id="q-field" data-lg-lens>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.6"/><path d="M20 20l-3.6-3.6"/></svg>
+        <input id="q" type="search" inputmode="search" placeholder="搜索法规名称、发布机关…" autocomplete="off">
+        <button class="field-clear" type="button" id="q-clear" aria-label="清空">×</button>
+      </div>
+
+      <!-- 搜索范围：标题 / 全文 -->
+      <div class="search-mode lg lg--seg lg-lens" id="search-mode" role="tablist" aria-label="搜索范围" data-lg-lens>
+        <span class="seg-pill" id="seg-pill" aria-hidden="true"></span>
+        <button class="seg-btn on" type="button" role="tab" data-mode="title" aria-selected="true">标题</button>
+        <button class="seg-btn" type="button" role="tab" data-mode="full" aria-selected="false">全文</button>
+      </div>
+
+      <div class="ft-bar" id="ft-bar" hidden>
+        <div class="ft-track"><i id="ft-fill"></i></div>
+        <span class="ft-label" id="ft-label">正在建立全文索引…</span>
+      </div>
+
+      <div class="chips" id="chips"></div>
+      <div class="chips region-chips prov-chips" id="region-chips" hidden></div>
+      <div class="chips region-chips city-chips" id="city-chips" hidden></div>
+      <div class="list-meta" id="lib-count">—</div>
+      <div class="stack" id="lib-list"></div>
+      <div class="list-more" id="lib-more" hidden>
+        <button class="btn" type="button" id="load-more">加载更多</button>
+      </div>
+    </section>
+
+    <!-- ================= 书签 ================= -->
+    <section id="tab-fav" class="tab-pane">
+      <div class="glass-page-heading">
+        <h1>书签</h1>
+        <p>长按列表项或阅读页右上角即可收藏</p>
+      </div>
+      <div class="stack" id="fav-list"></div>
+    </section>
+
+    <!-- ================= 我的 ================= -->
+    <section id="tab-me" class="tab-pane">
+      <div class="glass-page-heading">
+        <h1>我的</h1>
+        <p>离线版 · 无需登录</p>
+      </div>
+
+      <div class="glass-section-heading"><h2>阅读</h2></div>
+      <div class="card rows">
+        <button class="row" type="button" id="row-theme">
+          <span class="row-key">显示外观</span>
+          <span class="row-val" id="val-theme">跟随系统</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button class="row" type="button" id="row-lfont">
+          <span class="row-key">列表字号</span>
+          <span class="row-val" id="val-lfont">15</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button class="row" type="button" id="row-bfont">
+          <span class="row-key">正文字号</span>
+          <span class="row-val" id="val-bfont">17</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button class="row" type="button" id="row-immersive">
+          <span class="row-key">沉浸模式</span>
+          <span class="row-val" id="val-immersive">隐藏状态栏</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="glass-section-heading"><h2>数据</h2></div>
+      <div class="card rows">
+        <button class="row" type="button" id="row-offline">
+          <span class="row-key">离线数据</span>
+          <span class="row-val" id="val-offline">—</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button class="row" type="button" id="row-favclear">
+          <span class="row-key">清空书签</span>
+          <span class="row-val" id="val-favcount">0 条</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="glass-section-heading"><h2>关于</h2></div>
+      <div class="card rows">
+        <button class="row" type="button" id="row-source">
+          <span class="row-key">数据来源</span>
+          <span class="row-val">国家法律法规数据库</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button class="row" type="button" id="row-about">
+          <span class="row-key">关于本软件</span>
+          <span class="row-val" id="val-version">1.0.0</span>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+
+      <p class="foot-note" id="foot-ver">LexiGlass · 离线版</p>
+    </section>
+
+  </main>
+
+  <!-- ================= 阅读页 ================= -->
+  <section class="reader" id="reader" aria-hidden="true">
+    <!-- 滚动容器：头部（顶栏 + 页内搜索）必须放在它内部并 sticky，
+         否则 Chromium 的 backdrop-filter 采不到兄弟滚动容器的内容，玻璃会变成一块死白 -->
+    <div class="reader-scroll" id="reader-scroll">
+      <header class="reader-head">
+        <div class="reader-bar">
+          <button class="icon-btn" type="button" id="reader-back" aria-label="返回">
+            <svg viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <div class="reader-title" id="reader-title">—</div>
+          <button class="icon-btn" type="button" id="reader-fav" aria-label="收藏">
+            <svg viewBox="0 0 24 24"><path d="M6.5 4.5h11v15.5l-5.5-4.1-5.5 4.1z"/></svg>
+          </button>
+          <button class="icon-btn" type="button" id="reader-copy" aria-label="复制全文">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="10.5" height="10.5" rx="2.4"/><path d="M15 6.5H6.5A2 2 0 0 0 4.5 8.5V17"/></svg>
+          </button>
+          <button class="text-btn" type="button" id="reader-toc">目录</button>
+        </div>
+
+      </header>
+
+      <!-- 页内搜索独立成一层：必须是 header 的兄弟节点，
+           header 一旦成为 backdrop 根（backdrop-filter / mask），
+           这里面的透镜就只能采到「已经糊过的画面」，折射就没了 -->
+      <div class="reader-search">
+        <div class="field compact lg lg--search lg-lens" id="dq-field" data-lg-lens>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.6"/><path d="M20 20l-3.6-3.6"/></svg>
+          <input id="dq" type="search" inputmode="search" placeholder="页内搜索，输入数字跳转到对应条款">
+        </div>
+      </div>
+
+      <div id="reader-body"><div class="loading">正在装载…</div></div>
+    </div>
+  </section>
+
+  <!-- 目录抽屉 -->
+  <div class="sheet-mask toc-mask" id="toc-mask" hidden>
+    <aside class="sheet lg lg--sheet lg-lens" id="toc-sheet" role="dialog" aria-label="目录" data-lg-lens>
+      <div class="sheet-head">
+        <h3>目录</h3>
+        <button class="icon-btn" type="button" id="toc-close" aria-label="关闭">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body" id="toc-body"></div>
+    </aside>
+  </div>
+
+  <!-- ================= 选项窗口（单选 / 信息 / 确认） ================= -->
+  <div class="sheet-mask opt-mask" id="opt-mask" hidden>
+    <div class="opt-sheet lg lg--sheetcard lg-lens" id="opt-sheet" role="dialog" aria-modal="true"
+         aria-labelledby="opt-title" data-lg-lens>
+      <div class="opt-head">
+        <button class="opt-back" type="button" id="opt-back" aria-label="返回" hidden>
+          <svg viewBox="0 0 24 24"><path d="M14.5 5.5 8 12l6.5 6.5"/></svg>
+        </button>
+        <h3 id="opt-title">选项</h3>
+        <button class="icon-btn" type="button" id="opt-close" aria-label="关闭">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="opt-body" id="opt-body"></div>
+      <div class="opt-foot" id="opt-foot" hidden>
+        <button class="opt-btn" type="button" id="opt-cancel">取消</button>
+        <button class="opt-btn opt-btn--primary" type="button" id="opt-ok">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Liquid Glass Dock ================= -->
+  <nav class="nav-tabs" id="bottom-nav" aria-label="主导航">
+    <div class="nav-glass lg-lens" aria-hidden="true"></div>
+    <div class="nav-pill" id="nav-pill" aria-hidden="true" data-lg-lens></div>
+    <button class="tab-btn active" type="button" data-icon="home" data-tab="home">首页</button>
+    <button class="tab-btn" type="button" data-icon="library" data-tab="library">法规库</button>
+    <button class="tab-btn" type="button" data-icon="bookmark" data-tab="fav">书签</button>
+    <button class="tab-btn" type="button" data-icon="user" data-tab="me">我的</button>
+  </nav>
+
+<script src="vendor/dock.js"></script>
+<script src="js/app.js"></script>
+<script data-lg-injected>window.__lgManualInit||LiquidGlass.init({lens:true,interactive:true,specularSelector:'.law,.stat-card,.cat-tile,.region-tile,.reader-info,.chip,.btn,.glass-hero-button,.menu-item,.seg-btn,.more-btn'});</script>
+</body>
+</html>
