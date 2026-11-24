@@ -17,6 +17,19 @@
 | ![地方法规两级筛选](screenshots/03-local.png) | ![按地区浏览](screenshots/04-region.png) |
 | ![全文搜索](screenshots/05-fulltext.png) | ![阅读页](screenshots/06-reader.png) |
 
+## 下载
+
+| 文件 | 内容 | 体积 |
+|---|---|---|
+| [LexiGlass-1.0.0.apk](https://github.com/Zihium/lexiglass/releases/download/v1.0.0/LexiGlass-1.0.0.apk) | 1.0.0 正式包 · 25,228 部 / 14,339 万字 | 118 MB |
+| [LexiGlass-3.1.1-baseline.apk](https://github.com/Zihium/lexiglass/releases/download/v1.0.0/LexiGlass-3.1.1-baseline.apk) | 3.1.1 基线包（修改前版本）· 1,461 部 / 697 万字 | 7.6 MB |
+
+```bash
+adb install -r LexiGlass-1.0.0.apk
+```
+
+要求 Android 8.0（API 26）及以上。数据全部随包携带，首次启动即可检索，无需联网、无需导入。
+
 ## 特性
 
 - **全量离线**：25,228 部法规（宪法、法律、行政法规、司法解释、23,767 部地方性法规），1.43 亿字正文随包携带，断网可用。
